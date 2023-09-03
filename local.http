@@ -1,0 +1,40 @@
+# dev site
+@host = http://127.0.0.1:8080
+# @host = https://dev-urlproxy.awoo.org
+# prd site
+# @host = https://dev-amp-api-test.awoo.org
+# dev site
+# @host = https://amp-api-test.awoo.org
+@token = 10a2401fa20ba39f98b2c369effc45f00e51d089
+
+###
+GET {{host}}/health
+Content-Type: application/json
+
+###
+GET {{host}}/api/todos
+Content-Type: application/json
+
+###
+POST {{host}}/api/todos
+Content-Type: application/json
+
+{
+    "Title": "購物",
+    "Description": "去超市購買雜貨",
+    "Completed": false
+}
+
+###
+PUT {{host}}/api/todos/1
+Content-Type: application/json
+
+{
+    "Title": "購物PUT",
+    "Description": "去超市購買雜貨",
+    "Completed": false
+}
+
+###
+DELETE {{host}}/api/todos/1
+Content-Type: application/json
