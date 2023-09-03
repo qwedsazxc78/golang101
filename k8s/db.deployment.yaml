@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: golang101
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:14.1
+          env:
+            - name: POSTGRES_USER
+              value: golang101
+            - name: POSTGRES_PASSWORD
+              value: golang101pass
+            - name: POSTGRES_DB
+              value: golang101
+          ports:
+            - containerPort: 5432

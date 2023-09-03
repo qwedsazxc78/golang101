@@ -1,91 +1,112 @@
+// controllers/todo_controller.go
 package controllers
 
 import (
-    "net/http"
-    "github.com/gin-gonic/gin"
-    "gorm.io/gorm"
-    "strconv"
-    "golang101/models"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+	"gorm.io/gorm"
+	"golang101/models"
 )
 
 type TodoController struct {
-    db *gorm.DB
+	db          *gorm.DB
+	redisClient *redis.Client
 }
 
-// 初始化TodoController
-func NewTodoController(db *gorm.DB) *TodoController {
-    return &TodoController{
-        db: db,
-    }
+func NewTodoController(db *gorm.DB, rdb *redis.Client) *TodoController {
+	return &TodoController{
+		db:          db,
+		redisClient: rdb,
+	}
 }
 
-// 新增待辦事項
 func (c *TodoController) CreateTodo(ctx *gin.Context) {
-    var todo models.Todo
-    if err := ctx.ShouldBindJSON(&todo); err != nil {
-        ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var todo models.Todo
+	if err := ctx.ShouldBindJSON(&todo); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    c.db.Create(&todo)
-    ctx.JSON(http.StatusOK, todo)
+	c.db.Create(&todo)
+	ctx.JSON(http.StatusOK, todo)
+	c.refreshRedisCache(ctx)
 }
 
-// 取得所有待辦事項
 func (c *TodoController) GetTodos(ctx *gin.Context) {
-    // 獲取分頁參數
-    page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-    size, _ := strconv.Atoi(ctx.DefaultQuery("size", "20"))
+	cachedData, err := c.redisClient.Get(ctx, "todos").Result()
+	if err == nil {
+		var todos []models.Todo
+		json.Unmarshal([]byte(cachedData), &todos)
 
-    var todos []models.Todo
-    var total int64
+		ctx.JSON(http.StatusOK, todos)
+		return
+	}
 
-    // 分頁查詢
-    offset := (page - 1) * size
-    c.db.Offset(offset).Limit(size).Find(&todos)
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(ctx.DefaultQuery("size", "20"))
 
-    // 獲取總數
-    c.db.Model(&models.Todo{}).Count(&total)
+	var todos []models.Todo
+	var total int64
 
-    ctx.JSON(http.StatusOK, gin.H{
-        "page":  page,
-        "size":  size,
-        "total": total,
-        "data":  todos,
-    })
+	offset := (page - 1) * size
+	c.db.Offset(offset).Limit(size).Find(&todos)
+	c.db.Model(&models.Todo{}).Count(&total)
+
+	todosJSON, _ := json.Marshal(todos)
+	ctx.JSON(http.StatusOK, gin.H{
+		"page":  page,
+		"size":  size,
+		"total": total,
+		"data":  todos,
+	})
+	c.redisClient.Set(ctx, "todos", todosJSON, time.Hour)
 }
 
-// 更新待辦事項
+
 func (c *TodoController) UpdateTodo(ctx *gin.Context) {
-    var todo models.Todo
-    todoID := ctx.Param("id")
+	var todo models.Todo
+	todoID := ctx.Param("id")
 
-    if err := c.db.First(&todo, todoID).Error; err != nil {
-        ctx.JSON(http.StatusNotFound, gin.H{"error": "找不到該待辦事項"})
-        return
-    }
+	if err := c.db.First(&todo, todoID).Error; err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "找不到該待辦事項"})
+		return
+	}
 
-    if err := ctx.ShouldBindJSON(&todo); err != nil {
-        ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	if err := ctx.ShouldBindJSON(&todo); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    c.db.Save(&todo)
-    ctx.JSON(http.StatusOK, todo)
+	c.db.Save(&todo)
+	ctx.JSON(http.StatusOK, todo)
+	c.refreshRedisCache(ctx)
 }
 
-// 刪除待辦事項
 func (c *TodoController) DeleteTodo(ctx *gin.Context) {
-    var todo models.Todo
-    todoID := ctx.Param("id")
+	var todo models.Todo
+	todoID := ctx.Param("id")
 
-    if err := c.db.First(&todo, todoID).Error; err != nil {
-        ctx.JSON(http.StatusNotFound, gin.H{"error": "找不到該待辦事項"})
-        return
-    }
+	if err := c.db.First(&todo, todoID).Error; err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "找不到該待辦事項"})
+		return
+	}
 
-    c.db.Delete(&todo)
-    ctx.JSON(http.StatusOK, gin.H{"message": "已刪除待辦事項"})
+	c.db.Delete(&todo)
+	ctx.JSON(http.StatusOK, gin.H{"message": "已刪除待辦事項"})
+	c.refreshRedisCache(ctx)
 }
 
-// ... （其他操作，根據需求新增更多方法）
+// redis update strategy: after updating data, refresh cache
+// note: it doesn't fit big table
+func (c *TodoController) refreshRedisCache(ctx *gin.Context) {
+	var todos []models.Todo
+	c.db.Find(&todos)
+
+	todosJSON, _ := json.Marshal(todos)
+	c.redisClient.Set(ctx, "todos", todosJSON, time.Hour)
+}

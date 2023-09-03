@@ -1,0 +1,20 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: golang101-
+build:
+  local:
+    push: false
+  artifacts:
+    - image: api
+      docker:
+        dockerfile: Dockerfile
+manifests:
+  rawYaml:
+    - k8s/api.deployment.yaml
+    - k8s/api.secret.yaml
+    - k8s/api.service.yaml
+    - k8s/db.deployment.yaml
+    - k8s/db.service.yaml
+    - k8s/redis.deployment.yaml
+    - k8s/redis.service.yaml

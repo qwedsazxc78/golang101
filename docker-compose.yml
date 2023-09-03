@@ -1,20 +1,18 @@
 version: '3'
 services:
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     - redis
-  #     - postgres
-  #   environment:
-  #     - REDIS_ADDR=redis:6379
-  #     - POSTGRES_ADDR=postgres
-  #     - POSTGRES_USER=golang101
-  #     - POSTGRES_PASSWORD=golang101pass
-  #     - POSTGRES_DB=yourdbname
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DB_DSN: "host=postgres user=golang101 password=golang101pass dbname=golang101 sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      REDIS_PASSWORD: ""
 
   redis:
     image: redis:6.2.6  # 使用固定版本的Redis映像

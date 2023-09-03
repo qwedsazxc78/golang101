@@ -26,7 +26,7 @@ Content-Type: application/json
 }
 
 ###
-PUT {{host}}/api/todos/1
+PUT {{host}}/api/todos/15
 Content-Type: application/json
 
 {

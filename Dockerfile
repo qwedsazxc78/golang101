@@ -1,5 +1,5 @@
 # Build Stage
-FROM --platform=linux/amd64 golang:1.20 AS build
+FROM golang:1.20 AS build
 
 WORKDIR /app
 
